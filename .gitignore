@@ -1,0 +1,17 @@
+# Dados e credenciais (NUNCA versionar)
+.env
+*.token
+token_cache.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+
+# Dados
+data/
