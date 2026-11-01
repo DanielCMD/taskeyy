@@ -150,16 +150,14 @@ def render_tasks_panel(db: TaskDatabase) -> None:
     lists = db.get_lists()
     list_name = next((l["name"] for l in lists if l["id"] == list_id), "Desconhecida")
     
-    st.subheader(f"📋 Tarefas: {list_name}")
+    st.subheader(f"📋 {list_name}")
     
     # --- BARRA DE FILTROS ---
     tasks = db.get_tasks_by_list(list_id)
     
     if tasks:
-        st.markdown("**Filtros:**")
         col_f1, col_f2, col_f3 = st.columns(3)
         
-        # Extrair valores únicos para os filtros
         origens = sorted(list(set(t["origin"] for t in tasks if t["origin"])))
         prioridades = ["Crítico", "Alta", "Média", "Baixa"]
         status_opcoes = ["Backlog", "Fazendo", "Bloqueio", "Feito"]
@@ -171,15 +169,12 @@ def render_tasks_panel(db: TaskDatabase) -> None:
         with col_f3:
             filter_status = st.multiselect("Status", status_opcoes, key="filter_status")
             
-        # Aplicar filtros (lógica em Python)
         if filter_origin:
             tasks = [t for t in tasks if t["origin"] in filter_origin]
         if filter_priority:
             tasks = [t for t in tasks if t["priority"] in filter_priority]
         if filter_status:
             tasks = [t for t in tasks if t["status"] in filter_status]
-            
-        st.divider()
 
     # --- FORMULÁRIO DE NOVA TAREFA ---
     if "expand_task_form" not in st.session_state:
@@ -223,23 +218,19 @@ def render_tasks_panel(db: TaskDatabase) -> None:
 
     # --- LISTA DE TAREFAS ---
     if not tasks:
-        st.write("Nenhuma tarefa encontrada com os filtros atuais.")
+        st.write("Nenhuma tarefa encontrada.")
         return
 
     for task in tasks:
         with st.container():
-            col_title, col_status = st.columns([3, 1])
+            # Exibe o título e os metadados
+            st.markdown(f"**{task['title']}**")
             
-            with col_title:
-                st.markdown(f"**{task['title']}**")
-                st.caption(f"Origem: {task['origin'] or 'N/A'} | Prioridade: {task['priority']}")
+            # Junta Status, Origem e Prioridade em uma única linha
+            st.caption(f"Status: {task['status']} | Origem: {task['origin'] or 'N/A'} | Prioridade: {task['priority']}")
             
-            with col_status:
-                if st.button(f"➡️ {task['status']}", key=f"status_{task['id']}"):
-                    st.session_state["selected_task_id"] = task["id"]
-                    st.rerun()
-            
-            if st.button("Abrir Detalhes", key=f"btn_task_{task['id']}"):
+            # Botão único para abrir detalhes
+            if st.button("Abrir Detalhes", key=f"btn_task_{task['id']}", use_container_width=True):
                 st.session_state["selected_task_id"] = task["id"]
                 st.rerun()
                 
@@ -401,7 +392,8 @@ def main() -> None:
     
     render_sidebar(db)
     
-    col_left, col_center, col_right = st.columns([1.5, 3, 2.5])
+    #col_left, col_center, col_right = st.columns([1.5, 3, 2.5])
+    col_left, col_center, col_right = st.columns([1, 2, 4])
     
     with col_left:
         render_lists_panel(db)
