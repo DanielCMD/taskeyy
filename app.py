@@ -135,7 +135,6 @@ def render_lists_panel(db: TaskDatabase) -> None:
 # =============================================================
 # Panel 2: Tasks (Center)
 # =============================================================
-
 def render_tasks_panel(db: TaskDatabase) -> None:
     """
     Render the center panel with tasks from the selected list.
@@ -153,58 +152,81 @@ def render_tasks_panel(db: TaskDatabase) -> None:
     
     st.subheader(f"📋 Tarefas: {list_name}")
     
-    # Add Task Button (Opens form)
-    # Usamos uma chave única para o expander para podermos fechá-lo
-    with st.expander("➕ Nova Tarefa", expanded=st.session_state.get("expand_task_form", False)):
-        title = st.text_input("Título", key="task_title")
-        desc = st.text_area("Descrição", key="task_desc")
+    # --- BARRA DE FILTROS ---
+    tasks = db.get_tasks_by_list(list_id)
+    
+    if tasks:
+        st.markdown("**Filtros:**")
+        col_f1, col_f2, col_f3 = st.columns(3)
         
-        col1, col2 = st.columns(2)
-        with col1:
-            priority = st.selectbox("Prioridade", ["Baixa", "Média", "Alta", "Crítico"], key="task_prio")
-            status = st.selectbox("Status", ["Backlog", "Fazendo", "Bloqueio", "Feito"], key="task_status")
-        with col2:
-            origin = st.text_input("Origem (ex: Projeto X)", key="task_origin")
-            date_planned = st.date_input("Data Planejada", value=None, key="task_date")
+        # Extrair valores únicos para os filtros
+        origens = sorted(list(set(t["origin"] for t in tasks if t["origin"])))
+        prioridades = ["Crítico", "Alta", "Média", "Baixa"]
+        status_opcoes = ["Backlog", "Fazendo", "Bloqueio", "Feito"]
+        
+        with col_f1:
+            filter_origin = st.multiselect("Origem", origens, key="filter_origin")
+        with col_f2:
+            filter_priority = st.multiselect("Prioridade", prioridades, key="filter_priority")
+        with col_f3:
+            filter_status = st.multiselect("Status", status_opcoes, key="filter_status")
             
-        if st.button("Salvar Tarefa", type="primary"):
-            if title.strip():
-                date_str = date_planned.strftime("%Y-%m-%d") if date_planned else None
-                db.create_task(
-                    list_id=list_id,
-                    title=title,
-                    description=desc,
-                    status=status,
-                    priority=priority,
-                    origin=origin,
-                    date_planned=date_str
-                )
+        # Aplicar filtros (lógica em Python)
+        if filter_origin:
+            tasks = [t for t in tasks if t["origin"] in filter_origin]
+        if filter_priority:
+            tasks = [t for t in tasks if t["priority"] in filter_priority]
+        if filter_status:
+            tasks = [t for t in tasks if t["status"] in filter_status]
+            
+        st.divider()
+
+    # --- FORMULÁRIO DE NOVA TAREFA ---
+    if "expand_task_form" not in st.session_state:
+        st.session_state["expand_task_form"] = False
+
+    with st.expander("➕ Nova Tarefa", expanded=st.session_state["expand_task_form"]):
+        with st.form(key="form_new_task", clear_on_submit=True):
+            title = st.text_input("Título")
+            desc = st.text_area("Descrição")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                priority = st.selectbox("Prioridade", ["Baixa", "Média", "Alta", "Crítico"])
+                status = st.selectbox("Status", ["Backlog", "Fazendo", "Bloqueio", "Feito"])
+            with col2:
+                origin = st.text_input("Origem (ex: Projeto X)")
+                date_planned = st.date_input("Data Planejada", value=None)
                 
-                # Limpar os campos do formulário
-                keys_to_clear = ["task_title", "task_desc", "task_prio", "task_status", "task_origin", "task_date"]
-                for key in keys_to_clear:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                
-                # Fechar o expander
-                st.session_state["expand_task_form"] = False
-                
-                st.success("Tarefa criada!")
-                st.rerun()
-            else:
-                st.warning("O título é obrigatório.")
+            submitted = st.form_submit_button("Salvar Tarefa", type="primary")
+            
+            if submitted:
+                if title.strip():
+                    date_str = date_planned.strftime("%Y-%m-%d") if date_planned else None
+                    db.create_task(
+                        list_id=list_id,
+                        title=title,
+                        description=desc,
+                        status=status,
+                        priority=priority,
+                        origin=origin,
+                        date_planned=date_str
+                    )
+                    
+                    st.session_state["expand_task_form"] = False
+                    st.toast("Tarefa criada com sucesso!", icon="✅")
+                    st.rerun()
+                else:
+                    st.warning("O título é obrigatório.")
 
     st.divider()
 
-    # List Tasks
-    tasks = db.get_tasks_by_list(list_id)
-    
+    # --- LISTA DE TAREFAS ---
     if not tasks:
-        st.write("Nenhuma tarefa nesta lista.")
+        st.write("Nenhuma tarefa encontrada com os filtros atuais.")
         return
 
     for task in tasks:
-        # Task Card layout
         with st.container():
             col_title, col_status = st.columns([3, 1])
             
@@ -213,18 +235,15 @@ def render_tasks_panel(db: TaskDatabase) -> None:
                 st.caption(f"Origem: {task['origin'] or 'N/A'} | Prioridade: {task['priority']}")
             
             with col_status:
-                # Inline status update button
                 if st.button(f"➡️ {task['status']}", key=f"status_{task['id']}"):
                     st.session_state["selected_task_id"] = task["id"]
                     st.rerun()
             
-            # Select task button
             if st.button("Abrir Detalhes", key=f"btn_task_{task['id']}"):
                 st.session_state["selected_task_id"] = task["id"]
                 st.rerun()
                 
             st.divider()
-
 
 # =============================================================
 # Panel 3: Details (Right)
@@ -251,39 +270,105 @@ def render_details_panel(db: TaskDatabase) -> None:
 
     st.subheader("🔍 Detalhes")
     
-    st.markdown(f"### {task['title']}")
-    st.markdown(f"**Status:** {task['status']} | **Prioridade:** {task['priority']}")
-    
-    if task['description']:
-        st.markdown("**Descrição:**")
-        st.info(task['description'])
+    # Controle do estado de edição
+    edit_key = f"edit_mode_{task_id}"
+    if edit_key not in st.session_state:
+        st.session_state[edit_key] = False
+
+    # --- MODO DE EDIÇÃO ---
+    if st.session_state[edit_key]:
+        st.markdown(f"### ✏️ Editando: {task['title']}")
         
-    col1, col2 = st.columns(2)
-    with col1:
-        st.caption(f"**Criado em:** {task['date_created'].strftime('%d/%m/%Y')}")
-        st.caption(f"**Planejado:** {task['date_planned'].strftime('%d/%m/%Y') if task['date_planned'] else 'N/A'}")
-    with col2:
-        st.caption(f"**Origem:** {task['origin'] or 'N/A'}")
+        with st.form(key=f"form_edit_{task_id}"):
+            edit_title = st.text_input("Título", value=task['title'])
+            edit_desc = st.text_area("Descrição", value=task['description'] or "")
+            
+            col_e1, col_e2 = st.columns(2)
+            with col_e1:
+                edit_priority = st.selectbox(
+                    "Prioridade", 
+                    ["Baixa", "Média", "Alta", "Crítico"], 
+                    index=["Baixa", "Média", "Alta", "Crítico"].index(task['priority'])
+                )
+            with col_e2:
+                edit_origin = st.text_input("Origem", value=task['origin'] or "")
+                
+            edit_date = st.date_input(
+                "Data Planejada", 
+                value=task['date_planned'] if task['date_planned'] else None
+            )
+            
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.form_submit_button("Salvar", type="primary", use_container_width=True):
+                    date_str = edit_date.strftime("%Y-%m-%d") if edit_date else None
+                    db.update_task_details(
+                        task_id=task_id,
+                        title=edit_title,
+                        description=edit_desc,
+                        priority=edit_priority,
+                        status=task['status'],
+                        origin=edit_origin,
+                        date_planned=date_str
+                    )
+                    st.session_state[edit_key] = False
+                    st.toast("Tarefa atualizada!", icon="✅")
+                    st.rerun()
+            with col_btn2:
+                if st.form_submit_button("Cancelar", use_container_width=True):
+                    st.session_state[edit_key] = False
+                    st.rerun()
         
-    st.divider()
-    
-    # Status Update
-    st.markdown("**Atualizar Status:**")
-    new_status = st.radio(
-        "Mudar para:", 
-        ["Backlog", "Fazendo", "Bloqueio", "Feito"], 
-        index=["Backlog", "Fazendo", "Bloqueio", "Feito"].index(task['status']),
-        horizontal=True,
-        key=f"status_radio_{task_id}"
-    )
-    if new_status != task['status']:
-        if st.button("Salvar Novo Status", key=f"btn_status_{task_id}"):
-            db.update_task_status(task_id, new_status)
+    # --- MODO DE VISUALIZAÇÃO ---
+    else:
+        col_title, col_btn = st.columns([3, 1])
+        with col_title:
+            st.markdown(f"### {task['title']}")
+        with col_btn:
+            if st.button("✏️ Editar", use_container_width=True):
+                st.session_state[edit_key] = True
+                st.rerun()
+
+        st.markdown(f"**Status:** {task['status']} | **Prioridade:** {task['priority']}")
+        
+        if task['description']:
+            st.markdown("**Descrição:**")
+            st.info(task['description'])
+            
+        col1, col2 = st.columns(2)
+        with col1:
+            st.caption(f"**Criado em:** {task['date_created'].strftime('%d/%m/%Y')}")
+            st.caption(f"**Planejado:** {task['date_planned'].strftime('%d/%m/%Y') if task['date_planned'] else 'N/A'}")
+        with col2:
+            st.caption(f"**Origem:** {task['origin'] or 'N/A'}")
+            
+        st.divider()
+        
+        # Status Update
+        st.markdown("**Atualizar Status:**")
+        new_status = st.radio(
+            "Mudar para:", 
+            ["Backlog", "Fazendo", "Bloqueio", "Feito"], 
+            index=["Backlog", "Fazendo", "Bloqueio", "Feito"].index(task['status']),
+            horizontal=True,
+            key=f"status_radio_{task_id}"
+        )
+        if new_status != task['status']:
+            if st.button("Salvar Novo Status", key=f"btn_status_{task_id}"):
+                db.update_task_status(task_id, new_status)
+                st.rerun()
+
+        # --- Deletar Tarefa ---
+        st.markdown("**Zona de Perigo:**")
+        if st.button("🗑️ Deletar Tarefa", type="secondary", use_container_width=True):
+            db.delete_task(task_id)
+            st.session_state["selected_task_id"] = None
+            st.toast("Tarefa deletada.", icon="🗑️")
             st.rerun()
 
     st.divider()
 
-    # Comments Section
+    # Comments Section (Sempre visível)
     st.markdown("**Comentários:**")
     comments = db.get_comments_by_task(task_id)
     
@@ -295,7 +380,6 @@ def render_details_panel(db: TaskDatabase) -> None:
         if new_comment.strip():
             db.create_comment(task_id, new_comment)
             
-            # Limpar o campo de comentário
             if f"comment_{task_id}" in st.session_state:
                 del st.session_state[f"comment_{task_id}"]
                 
@@ -313,8 +397,6 @@ def main() -> None:
     
     render_custom_css()
     
-    # Instanciando o banco de dados a cada rerun.
-    # O Neon (com connection pooling) gerencia isso de forma eficiente.
     db = TaskDatabase()
     
     render_sidebar(db)

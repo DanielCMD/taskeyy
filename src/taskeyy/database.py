@@ -290,6 +290,76 @@ class TaskDatabase:
         self.conn.commit()
 
 
+    def update_task_details(
+        self,
+        task_id: int,
+        title: str,
+        description: str,
+        priority: str,
+        status: str,
+        origin: str,
+        date_planned: str
+    ) -> None:
+        """
+        Update the details of a specific task.
+
+        Args:
+            task_id: ID of the task.
+            title: New title.
+            description: New description.
+            priority: New priority.
+            status: New status.
+            origin: New origin.
+            date_planned: New planned date (YYYY-MM-DD).
+        """
+        
+        cursor = self.conn.cursor()
+        
+        cursor.execute(
+            """
+            UPDATE tasks 
+            SET title = %s, 
+                description = %s, 
+                priority = %s, 
+                status = %s, 
+                origin = %s, 
+                date_planned = %s
+            WHERE id = %s
+            """,
+            (
+                title,
+                description,
+                priority,
+                status,
+                origin,
+                date_planned,
+                task_id
+            )
+        )
+        
+        self.conn.commit()
+
+
+    def delete_task(self, task_id: int) -> None:
+        """
+        Delete a specific task and its associated comments.
+
+        Args:
+            task_id:
+                The ID of the task to delete.
+        """
+        
+        cursor = self.conn.cursor()
+        
+        # O ON DELETE CASCADE nas foreign keys fará os comentários sumirem também
+        cursor.execute(
+            "DELETE FROM tasks WHERE id = %s",
+            (task_id,)
+        )
+        
+        self.conn.commit()
+
+
     # ---------------------------------------------------------
     # Comments Operations
     # ---------------------------------------------------------
