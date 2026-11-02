@@ -103,6 +103,28 @@ def render_sidebar(db: TaskDatabase) -> None:
                 st.warning("Digite um nome válido.")
 
 
+def render_dashboard_stats(db: TaskDatabase) -> None:
+    """
+    Render the mini dashboard with task statistics.
+    """
+    
+    stats = db.get_dashboard_stats()
+    
+    st.markdown("**Resumo:**")
+    
+    # Usamos colunas para alinhar os números e rótulos
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.metric(label="Abertas", value=stats["total_open"])
+        st.metric(label="Atrasadas", value=stats["overdue"], delta_color="inverse")
+        
+    with col2:
+        st.metric(label="Hoje", value=stats["today"])
+        st.metric(label="Semana", value=stats["week"])
+        
+    st.divider()
+
 # =============================================================
 # Panel 1: Lists (Left)
 # =============================================================
@@ -113,6 +135,9 @@ def render_lists_panel(db: TaskDatabase) -> None:
     """
     
     st.subheader("📁 Listas")
+
+    # --- NOVO: Renderiza as estatísticas ---
+    render_dashboard_stats(db)
     
     lists = db.get_lists()
     
@@ -216,25 +241,28 @@ def render_tasks_panel(db: TaskDatabase) -> None:
 
     st.divider()
 
-    # --- LISTA DE TAREFAS ---
+    # --- LISTA DE TAREFAS (CARTÃO CLICÁVEL) ---
     if not tasks:
         st.write("Nenhuma tarefa encontrada.")
         return
 
     for task in tasks:
-        with st.container():
-            # Exibe o título e os metadados
+        # Criamos um container com borda para simular o cartão
+        with st.container(border=True):
+            # Renderizamos o conteúdo do cartão
             st.markdown(f"**{task['title']}**")
-            
-            # Junta Status, Origem e Prioridade em uma única linha
             st.caption(f"Status: {task['status']} | Origem: {task['origin'] or 'N/A'} | Prioridade: {task['priority']}")
             
-            # Botão único para abrir detalhes
-            if st.button("Abrir Detalhes", key=f"btn_task_{task['id']}", use_container_width=True):
+            # Botão invisível que ocupa o cartão todo.
+            # Usamos uma chave única para cada tarefa.
+            if st.button(
+                "Abrir", 
+                key=f"btn_card_{task['id']}", 
+                use_container_width=True,
+                type="secondary" # deixa o botão mais neutro
+            ):
                 st.session_state["selected_task_id"] = task["id"]
                 st.rerun()
-                
-            st.divider()
 
 # =============================================================
 # Panel 3: Details (Right)
@@ -330,6 +358,8 @@ def render_details_panel(db: TaskDatabase) -> None:
         with col1:
             st.caption(f"**Criado em:** {task['date_created'].strftime('%d/%m/%Y')}")
             st.caption(f"**Planejado:** {task['date_planned'].strftime('%d/%m/%Y') if task['date_planned'] else 'N/A'}")
+            if task['date_real']:
+                st.caption(f"**Concluído em:** {task['date_real'].strftime('%d/%m/%Y %H:%M')}")
         with col2:
             st.caption(f"**Origem:** {task['origin'] or 'N/A'}")
             

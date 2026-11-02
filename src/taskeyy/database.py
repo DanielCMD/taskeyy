@@ -12,7 +12,7 @@ import os
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Load environment variables from the .env file.
 load_dotenv()
@@ -30,6 +30,7 @@ class TaskDatabase:
     Provides methods to:
         - Create the necessary tables (lists, tasks, comments).
         - Perform CRUD operations on lists, tasks, and comments.
+        - Calculate dashboard statistics.
     """
 
     def __init__(self) -> None:
@@ -213,6 +214,61 @@ class TaskDatabase:
         return [dict(row) for row in cursor.fetchall()]
 
 
+    def get_dashboard_stats(self) -> dict:
+        """
+        Calculate dashboard statistics for all open tasks.
+
+        Returns:
+            Dictionary with the counts for total, today,
+            overdue, and this week.
+        """
+        
+        cursor = self.conn.cursor()
+        
+        today = datetime.now().date()
+        
+        # Início e fim da semana atual (Segunda a Domingo)
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        
+        # Total de tarefas abertas (não "Feito")
+        cursor.execute("SELECT COUNT(*) FROM tasks WHERE status != 'Feito'")
+        total_open = cursor.fetchone()[0]
+        
+        # Tarefas para hoje
+        cursor.execute(
+            "SELECT COUNT(*) FROM tasks WHERE status != 'Feito' AND date_planned = %s",
+            (today,)
+        )
+        today_count = cursor.fetchone()[0]
+        
+        # Tarefas atrasadas (data planejada < hoje e não feito)
+        cursor.execute(
+            "SELECT COUNT(*) FROM tasks WHERE status != 'Feito' AND date_planned < %s",
+            (today,)
+        )
+        overdue_count = cursor.fetchone()[0]
+        
+        # Tarefas desta semana
+        cursor.execute(
+            """
+            SELECT COUNT(*) FROM tasks 
+            WHERE status != 'Feito' 
+            AND date_planned <= %s
+            AND date_planned >= %s
+            """,
+            (end_of_week, start_of_week)
+        )
+        week_count = cursor.fetchone()[0]
+        
+        return {
+            "total_open": total_open,
+            "today": today_count,
+            "overdue": overdue_count,
+            "week": week_count
+        }
+
+
     def create_task(
         self,
         list_id: int,
@@ -228,21 +284,6 @@ class TaskDatabase:
     ) -> bool:
         """
         Create a new task in a specific list.
-
-        Args:
-            list_id: ID of the list.
-            title: Task title.
-            description: Task description.
-            status: Status (Backlog, Fazendo, Bloqueio, Feito).
-            priority: Priority (Crítico, Alta, Média, Baixa).
-            origin: Origin (e.g., Projeto SAP Grower).
-            origin_detail: Detail (e.g., Email ID).
-            date_start: Start date (YYYY-MM-DD).
-            date_planned: Planned date (YYYY-MM-DD).
-            date_real: Real completion date (YYYY-MM-DD).
-
-        Returns:
-            True if created successfully.
         """
         
         cursor = self.conn.cursor()
@@ -275,17 +316,32 @@ class TaskDatabase:
         """
         Update the status of a specific task.
 
-        Args:
-            task_id: ID of the task.
-            new_status: The new status.
+        If the new status is 'Feito', automatically sets the
+        'date_real' column to the current date and time.
+        If the status is changed back from 'Feito', clears the
+        'date_real' column.
         """
         
         cursor = self.conn.cursor()
         
-        cursor.execute(
-            "UPDATE tasks SET status = %s WHERE id = %s",
-            (new_status, task_id)
-        )
+        if new_status == "Feito":
+            cursor.execute(
+                """
+                UPDATE tasks 
+                SET status = %s, date_real = CURRENT_TIMESTAMP 
+                WHERE id = %s
+                """,
+                (new_status, task_id)
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE tasks 
+                SET status = %s, date_real = NULL 
+                WHERE id = %s
+                """,
+                (new_status, task_id)
+            )
         
         self.conn.commit()
 
@@ -302,15 +358,6 @@ class TaskDatabase:
     ) -> None:
         """
         Update the details of a specific task.
-
-        Args:
-            task_id: ID of the task.
-            title: New title.
-            description: New description.
-            priority: New priority.
-            status: New status.
-            origin: New origin.
-            date_planned: New planned date (YYYY-MM-DD).
         """
         
         cursor = self.conn.cursor()
@@ -343,15 +390,10 @@ class TaskDatabase:
     def delete_task(self, task_id: int) -> None:
         """
         Delete a specific task and its associated comments.
-
-        Args:
-            task_id:
-                The ID of the task to delete.
         """
         
         cursor = self.conn.cursor()
         
-        # O ON DELETE CASCADE nas foreign keys fará os comentários sumirem também
         cursor.execute(
             "DELETE FROM tasks WHERE id = %s",
             (task_id,)
@@ -367,12 +409,6 @@ class TaskDatabase:
     def get_comments_by_task(self, task_id: int) -> list[dict]:
         """
         Retrieve all comments for a specific task.
-
-        Args:
-            task_id: ID of the task.
-
-        Returns:
-            List of dictionaries containing comment data.
         """
         
         cursor = self.conn.cursor(
@@ -390,10 +426,6 @@ class TaskDatabase:
     def create_comment(self, task_id: int, content: str) -> None:
         """
         Add a new comment to a specific task.
-
-        Args:
-            task_id: ID of the task.
-            content: The comment text.
         """
         
         cursor = self.conn.cursor()
