@@ -102,7 +102,6 @@ def render_sidebar(db: TaskDatabase) -> None:
             else:
                 st.warning("Digite um nome válido.")
 
-
 def render_dashboard_stats(db: TaskDatabase) -> None:
     """
     Render the mini dashboard with task statistics.
@@ -112,16 +111,26 @@ def render_dashboard_stats(db: TaskDatabase) -> None:
     
     st.markdown("**Resumo:**")
     
-    # Usamos colunas para alinhar os números e rótulos
+    # Linha 1: Abertas e Hoje
     col1, col2 = st.columns(2)
-    
     with col1:
         st.metric(label="Abertas", value=stats["total_open"])
-        st.metric(label="Atrasadas", value=stats["overdue"], delta_color="inverse")
-        
     with col2:
         st.metric(label="Hoje", value=stats["today"])
+        
+    # Linha 2: Atrasadas e Semana
+    col3, col4 = st.columns(2)
+    with col3:
+        st.metric(label="Atrasadas", value=stats["overdue"], delta_color="inverse")
+    with col4:
         st.metric(label="Semana", value=stats["week"])
+        
+    # Linha 3: Feitas Hoje e Últ. 7 dias
+    col5, col6 = st.columns(2)
+    with col5:
+        st.metric(label="Feitas Hoje", value=stats["done_today"])
+    with col6:
+        st.metric(label="Últ. 7 dias", value=stats["done_last_7_days"])
         
     st.divider()
 

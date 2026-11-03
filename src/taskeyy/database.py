@@ -216,11 +216,11 @@ class TaskDatabase:
 
     def get_dashboard_stats(self) -> dict:
         """
-        Calculate dashboard statistics for all open tasks.
+        Calculate dashboard statistics for all tasks.
 
         Returns:
-            Dictionary with the counts for total, today,
-            overdue, and this week.
+            Dictionary with counts for open tasks (total, today,
+            overdue, week) and completed tasks (today, last 7 days).
         """
         
         cursor = self.conn.cursor()
@@ -231,25 +231,22 @@ class TaskDatabase:
         start_of_week = today - timedelta(days=today.weekday())
         end_of_week = start_of_week + timedelta(days=6)
         
-        # Total de tarefas abertas (não "Feito")
+        # --- TAREFAS ABERTAS ---
         cursor.execute("SELECT COUNT(*) FROM tasks WHERE status != 'Feito'")
         total_open = cursor.fetchone()[0]
         
-        # Tarefas para hoje
         cursor.execute(
             "SELECT COUNT(*) FROM tasks WHERE status != 'Feito' AND date_planned = %s",
             (today,)
         )
         today_count = cursor.fetchone()[0]
         
-        # Tarefas atrasadas (data planejada < hoje e não feito)
         cursor.execute(
             "SELECT COUNT(*) FROM tasks WHERE status != 'Feito' AND date_planned < %s",
             (today,)
         )
         overdue_count = cursor.fetchone()[0]
         
-        # Tarefas desta semana
         cursor.execute(
             """
             SELECT COUNT(*) FROM tasks 
@@ -261,13 +258,31 @@ class TaskDatabase:
         )
         week_count = cursor.fetchone()[0]
         
+        # --- TAREFAS CONCLUÍDAS (MÉTRICAS DE PRODUTIVIDADE) ---
+        
+        # Finalizadas hoje
+        cursor.execute(
+            "SELECT COUNT(*) FROM tasks WHERE status = 'Feito' AND date_real::date = %s",
+            (today,)
+        )
+        done_today = cursor.fetchone()[0]
+        
+        # Finalizadas nos últimos 7 dias
+        seven_days_ago = today - timedelta(days=7)
+        cursor.execute(
+            "SELECT COUNT(*) FROM tasks WHERE status = 'Feito' AND date_real::date >= %s",
+            (seven_days_ago,)
+        )
+        done_last_7_days = cursor.fetchone()[0]
+        
         return {
             "total_open": total_open,
             "today": today_count,
             "overdue": overdue_count,
-            "week": week_count
+            "week": week_count,
+            "done_today": done_today,
+            "done_last_7_days": done_last_7_days
         }
-
 
     def create_task(
         self,
