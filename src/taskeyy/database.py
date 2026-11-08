@@ -178,14 +178,14 @@ class TaskDatabase:
     # ---------------------------------------------------------
     # Tasks Operations
     # ---------------------------------------------------------
-
-    def get_tasks_by_list(self, list_id: int) -> list[dict]:
+    def get_tasks_by_list(self, list_id: int, order_by: str = "priority") -> list[dict]:
         """
         Retrieve all tasks belonging to a specific list.
 
         Args:
-            list_id:
-                The ID of the list.
+            list_id: The ID of the list.
+            order_by: The ordering criteria. Options:
+                      'priority', 'date_planned', 'title', 'date_created'.
 
         Returns:
             List of dictionaries containing task data.
@@ -195,11 +195,9 @@ class TaskDatabase:
             cursor_factory=psycopg2.extras.DictCursor
         )
         
-        cursor.execute(
-            """
-            SELECT * FROM tasks 
-            WHERE list_id = %s 
-            ORDER BY 
+        # Mapeamento seguro de ordenação (evita SQL Injection)
+        order_map = {
+            "priority": """
                 CASE priority 
                     WHEN 'Crítico' THEN 1
                     WHEN 'Alta' THEN 2
@@ -207,6 +205,19 @@ class TaskDatabase:
                     WHEN 'Baixa' THEN 4
                 END ASC,
                 date_created DESC
+            """,
+            "date_planned": "date_planned ASC NULLS LAST",
+            "title": "title ASC",
+            "date_created": "date_created DESC"
+        }
+        
+        order_clause = order_map.get(order_by, order_map["priority"])
+        
+        cursor.execute(
+            f"""
+            SELECT * FROM tasks 
+            WHERE list_id = %s 
+            ORDER BY {order_clause}
             """, 
             (list_id,)
         )

@@ -35,7 +35,24 @@ def render_custom_css() -> None:
     st.markdown(
         """
         <style>
-        .block-container { padding-top: 2rem !important; padding-bottom: 1rem !important; }
+        /* Reduz o padding do topo */
+        .block-container { 
+            padding-top: 2rem !important; 
+            padding-bottom: 1rem !important; 
+        }
+
+        /* Aplica rolagem independente nas colunas central e direita */
+        div[data-testid="column"]:nth-of-type(2),
+        div[data-testid="column"]:nth-of-type(3) {
+            max-height: calc(100vh - 120px); /* Ajusta a altura com base na tela */
+            overflow-y: auto; /* Habilita a barra de rolagem */
+            padding-right: 10px; /* Espaço para a barra não colar no texto */
+        }
+
+        /* Esconde a barra de rolagem padrão do Streamlit na página toda */
+        body {
+            overflow: hidden;
+        }
         </style>
         """,
         unsafe_allow_html=True
