@@ -68,7 +68,6 @@ class TaskDatabase:
         Also creates a default list called 'Inbox' to ensure
         the user always has at least one list to add tasks to.
         """
-
         cursor = self.conn.cursor()
 
         # 1. Table: lists
@@ -77,10 +76,19 @@ class TaskDatabase:
             CREATE TABLE IF NOT EXISTS lists (
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL UNIQUE,
+                icon TEXT DEFAULT '📁',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+
+        # Adiciona a coluna 'icon' se a tabela já existia (migração)
+        try:
+            cursor.execute("ALTER TABLE lists ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '📁'")
+        except psycopg2.errors.DuplicateColumn:
+            self.conn.rollback() # Se der erro, desfaz a transação e continua
+        except Exception:
+            self.conn.rollback()
 
         # 2. Table: tasks
         cursor.execute(
@@ -137,40 +145,32 @@ class TaskDatabase:
             List of dictionaries containing list data.
         """
         
-        cursor = self.conn.cursor(
-            cursor_factory=psycopg2.extras.DictCursor
-        )
-        
-        cursor.execute(
-            "SELECT id, name FROM lists ORDER BY name ASC"
-        )
-        
+        cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cursor.execute("SELECT id, name, icon FROM lists ORDER BY name ASC")
         return [dict(row) for row in cursor.fetchall()]
 
 
-    def create_list(self, name: str) -> bool:
+    def create_list(self, name: str, icon: str = "📁") -> bool:
         """
         Create a new list.
 
         Args:
-            name:
-                The name of the list (e.g., 'Atvos').
+            name: The name of the list.
+            icon: The emoji/icon for the list.
 
         Returns:
             True if created successfully, False otherwise.
         """
-        
         cursor = self.conn.cursor()
         
         try:
             cursor.execute(
-                "INSERT INTO lists (name) VALUES (%s)", 
-                (name,)
+                "INSERT INTO lists (name, icon) VALUES (%s, %s)", 
+                (name, icon)
             )
             self.conn.commit()
             return True
         except psycopg2.IntegrityError:
-            # Occurs if the list name already exists (UNIQUE constraint)
             self.conn.rollback()
             return False
 

@@ -35,7 +35,7 @@ def render_lists_panel(db: TaskDatabase) -> None:
     """
     Render the left panel with all lists.
     """
-    st.subheader("📁 Listas")
+    st.subheader("Listas")
     render_dashboard_stats(db)
     
     lists = db.get_lists()
@@ -44,8 +44,12 @@ def render_lists_panel(db: TaskDatabase) -> None:
         return
 
     for lst in lists:
+        # Junta o ícone com o nome da lista
+        icon = lst.get("icon", "📁")
+        display_name = f"{icon} {lst['name']}"
+        
         if st.button(
-            lst["name"], 
+            display_name, 
             key=f"list_{lst['id']}",
             use_container_width=True,
             type="primary" if st.session_state.get("selected_list_id") == lst["id"] else "secondary"
@@ -53,3 +57,4 @@ def render_lists_panel(db: TaskDatabase) -> None:
             st.session_state["selected_list_id"] = lst["id"]
             st.session_state["selected_task_id"] = None
             st.rerun()
+            
