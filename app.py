@@ -16,6 +16,7 @@ from taskeyy.ui.sidebar import render_sidebar
 from taskeyy.ui.lists import render_lists_panel
 from taskeyy.ui.tasks import render_tasks_panel
 from taskeyy.ui.details import render_details_panel
+from taskeyy.ui.dashboard import render_dashboard
 
 # =============================================================
 # Page Configuration
@@ -62,23 +63,37 @@ def render_custom_css() -> None:
 # Main
 # =============================================================
 
+# =============================================================
+# Main
+# =============================================================
+
 def main() -> None:
     render_custom_css()
     
     db = TaskDatabase()
     
+    # Renderiza a barra lateral (que controla st.session_state["view"])
     render_sidebar(db)
     
-    col_left, col_center, col_right = st.columns([1, 2, 3.5])
+    # Verifica qual tela deve ser exibida
+    current_view = st.session_state.get("view", "tasks")
     
-    with col_left:
-        render_lists_panel(db)
+    if current_view == "dashboard":
+        # Chama a função do dashboard (que você vai criar)
+        render_dashboard(db)
+    else:
+        # Visão padrão de 3 painéis
+        col_left, col_center, col_right = st.columns([1, 2, 3.5])
         
-    with col_center:
-        render_tasks_panel(db)
-        
-    with col_right:
-        render_details_panel(db)
+        with col_left:
+            render_lists_panel(db)
+            
+        with col_center:
+            render_tasks_panel(db)
+            
+        with col_right:
+            render_details_panel(db)
+
 
 if __name__ == "__main__":
     main()

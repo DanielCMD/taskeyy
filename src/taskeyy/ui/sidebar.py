@@ -9,12 +9,35 @@ LIST_ICONS = ["📁", "🏠", "🚀", "🎯", "💼", "🏢", "💡", "📊", "�
 
 def render_sidebar(db: TaskDatabase) -> None:
     """
-    Render the sidebar with utilities.
+    Render the sidebar with navigation and utilities.
     """
     st.sidebar.title("✅ Taskeyy")
     st.sidebar.markdown("Gestão de tarefas e pendências")
+    
+    # Inicializa o estado da view se não existir
+    if "view" not in st.session_state:
+        st.session_state["view"] = "tasks"
+        
+    # --- MENU DE NAVEGAÇÃO ---
+    if st.sidebar.button(
+        "📋 Tarefas", 
+        use_container_width=True,
+        type="primary" if st.session_state["view"] == "tasks" else "secondary"
+    ):
+        st.session_state["view"] = "tasks"
+        st.rerun()
+        
+    if st.sidebar.button(
+        "📊 Dashboard", 
+        use_container_width=True,
+        type="primary" if st.session_state["view"] == "dashboard" else "secondary"
+    ):
+        st.session_state["view"] = "dashboard"
+        st.rerun()
+
     st.sidebar.divider()
     
+    # --- FORMULÁRIO DE NOVA LISTA ---
     with st.sidebar.expander("➕ Nova Lista"):
         new_list_name = st.text_input("Nome da lista", key="new_list_input")
         
