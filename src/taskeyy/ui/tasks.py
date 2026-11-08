@@ -67,16 +67,39 @@ def render_tasks_panel(db: TaskDatabase) -> None:
 
     st.divider()
 
-    # --- LISTA DE TAREFAS ---
+        # --- LISTA DE TAREFAS ---
     if not tasks:
         st.write("Nenhuma tarefa encontrada.")
         return
 
     for task in tasks:
         with st.container(border=True):
-            st.markdown(f"**{task['title']}**")
-            st.caption(f"Status: {task['status']} | Origem: {task['origin'] or 'N/A'} | Prioridade: {task['priority']}")
+            # Divide o cartão em duas colunas: a maior para o texto, a menor para o botão
+            col_text, col_btn = st.columns([0.85, 0.15])
             
-            if st.button("Abrir", key=f"btn_card_{task['id']}", use_container_width=True):
-                st.session_state["selected_task_id"] = task["id"]
-                st.rerun()
+            with col_text:
+                # Usamos Markdown com limite de linhas (não truncamos manualmente,
+                # mas o CSS do Streamlit já vai quebrar a linha)
+                # Limita o título a 150 caracteres
+                display_title = task['title']
+                if len(display_title) > 90:
+                    display_title = display_title[:90] + "..."
+                
+                st.markdown(f"**{display_title}**")
+                
+                st.caption(f"Status: {task['status']} | Origem: {task['origin'] or 'N/A'} | Prioridade: {task['priority']}")
+                
+                # Preview da descrição (só aparece se o título não for gigante?)
+                # Como não temos controle do tamanho do título no Streamlit, 
+                # vamos manter o preview sempre que houver descrição.
+                # if task['description']:
+                #    preview = task['description'][:100]
+                #    if len(task['description']) > 100:
+                #        preview += "..."
+                #    st.caption(f"_{preview}_")
+                    
+            with col_btn:
+                # Botão pequeno no canto superior direito
+                if st.button("↗", key=f"btn_card_{task['id']}", help="Abrir Detalhes"):
+                    st.session_state["selected_task_id"] = task["id"]
+                    st.rerun()
